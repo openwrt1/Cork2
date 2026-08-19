@@ -8,6 +8,7 @@
 import Foundation
 import CorkModels
 import CorkShared
+import CorkTerminalFunctions
 
 public func runLaunchCommand(executablePath: String, arguments: String, packageName: String) throws -> Process?
 {
@@ -45,6 +46,11 @@ public func runLaunchCommand(executablePath: String, arguments: String, packageN
     task.standardOutput = FileHandle.nullDevice
     task.standardError = FileHandle.nullDevice
     
+    ActiveProcessesRegistry.register(task)
+    task.terminationHandler = { terminatedTask in
+        ActiveProcessesRegistry.deregister(terminatedTask)
+    }
+    
     do
     {
         try task.run()
@@ -60,6 +66,15 @@ public func runLaunchCommand(executablePath: String, arguments: String, packageN
 public func resolveExecutableURL(for executableName: String, packageName: String) -> URL?
 {
     let fm = FileManager.default
+    
+    // 0. Try absolute path
+    if executableName.hasPrefix("/")
+    {
+        if fm.fileExists(atPath: executableName)
+        {
+            return URL(fileURLWithPath: executableName)
+        }
+    }
     
     // 1. Try standard brew bin directory
     let brewBinDir = AppConstants.shared.brewExecutablePath.deletingLastPathComponent()
